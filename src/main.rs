@@ -79,16 +79,39 @@ fn run() -> anyhow::Result<()> {
                     height,
                     image::imageops::FilterType::Lanczos3,
                 );
-                let mut new_alpha = image::imageops::blur(&new_alpha, 6.0);
-                image::imageops::colorops::contrast_in_place(&mut new_alpha, 2.0);
+                let w = upscaled.width() as f32;
+                let h = upscaled.height() as f32;
+                let m = 5.0;
+                let proj = imageproc::geometric_transformations::Projection::from_control_points(
+                    [(0., 0.), (w, 0.), (0., h), (w, h)],
+                    [(m, m), (w - m, m), (m, h - m), (w - m, h - m)],
+                )
+                .unwrap();
+                let new_alpha = imageproc::geometric_transformations::warp(
+                    &new_alpha,
+                    &proj,
+                    imageproc::geometric_transformations::Interpolation::Bicubic,
+                    image::Rgba([0, 0, 0, 0]),
+                );
+                let new_alpha = image::imageops::blur(&new_alpha, 4.0);
+                let proj = imageproc::geometric_transformations::Projection::from_control_points(
+                    [(0., 0.), (w, 0.), (0., h), (w, h)],
+                    [(-m, -m), (w + m, -m), (-m, h + m), (w + m, h + m)],
+                )
+                .unwrap();
+                let mut new_alpha = imageproc::geometric_transformations::warp(
+                    &new_alpha,
+                    &proj,
+                    imageproc::geometric_transformations::Interpolation::Bicubic,
+                    image::Rgba([0, 0, 0, 0]),
+                );
                 new_alpha.pixels_mut().for_each(|pixel| {
-                    if pixel.0[3] < 128 {
+                    if pixel.0[3] < 175 {
                         pixel.0[3] = 0;
                     } else {
                         pixel.0[3] = 255;
                     }
                 });
-                let new_alpha = image::imageops::blur(&new_alpha, 0.5);
 
                 // Get the AI upscaled image
                 let upscaled_rgba8 = upscaled.as_mut_rgba8().unwrap();
@@ -97,7 +120,11 @@ fn run() -> anyhow::Result<()> {
                     .zip(new_alpha.pixels())
                     // Update the alpha channel of the AI upscaled image with the plain-gaussian upscaled alpha
                     .for_each(|(pixel, gaussian_pixel)| {
-                        pixel.0[3] = gaussian_pixel.0[3];
+                        if pixel.0[3] < 50 {
+                            pixel.0 = gaussian_pixel.0;
+                        } else {
+                            pixel.0[3] = gaussian_pixel.0[3];
+                        }
                     });
 
                 // Save the modified image

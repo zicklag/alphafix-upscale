@@ -54,13 +54,21 @@ fn run() -> anyhow::Result<()> {
                 let orig_file = std::io::BufReader::new(orig_file);
                 let orig = image::load(orig_file, image::ImageFormat::from_path(orig_path)?)?;
 
-                let upscaled_file = std::fs::OpenOptions::new().read(true).open(upscaled_path)?;
+                std::fs::create_dir_all(alphafixed_path.parent().unwrap())?;
+                let upscaled_file = std::fs::OpenOptions::new()
+                    .read(true)
+                    .open(&upscaled_path)?;
                 let upscaled_file = std::io::BufReader::new(upscaled_file);
                 let mut upscaled =
                     image::load(upscaled_file, image::ImageFormat::from_path(orig_path)?)?;
 
                 // Get the original image
                 let alpha = orig.as_rgba8().unwrap();
+
+                if !alpha.pixels().any(|x| x.0[3] != 255) {
+                    std::fs::copy(upscaled_path, alphafixed_path)?;
+                    return Ok(());
+                }
 
                 // Upscale the original image using a plain gaussian filter
                 let width = upscaled.width();
@@ -71,20 +79,7 @@ fn run() -> anyhow::Result<()> {
                     height,
                     image::imageops::FilterType::Lanczos3,
                 );
-                let new_alpha = image::imageops::blur(&new_alpha, 4.0);
-                let h = height as f32;
-                let w = width as f32;
-                let m = 0.01 * h;
-                let mut new_alpha = imageproc::geometric_transformations::warp(
-                    &new_alpha,
-                    &imageproc::geometric_transformations::Projection::from_control_points(
-                        [(0., 0.), (w, 0.), (0., h), (w, h)],
-                        [(m, m), (w - m, m), (m, h - m), (w - m, h - m)],
-                    )
-                    .unwrap(),
-                    imageproc::geometric_transformations::Interpolation::Bicubic,
-                    image::Rgba([0, 0, 0, 0]),
-                );
+                let mut new_alpha = image::imageops::blur(&new_alpha, 6.0);
                 image::imageops::colorops::contrast_in_place(&mut new_alpha, 2.0);
                 new_alpha.pixels_mut().for_each(|pixel| {
                     if pixel.0[3] < 128 {
@@ -106,7 +101,6 @@ fn run() -> anyhow::Result<()> {
                     });
 
                 // Save the modified image
-                std::fs::create_dir_all(alphafixed_path.parent().unwrap())?;
                 upscaled_rgba8.save(alphafixed_path)?;
 
                 Ok(())

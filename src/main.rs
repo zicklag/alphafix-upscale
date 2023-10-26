@@ -94,6 +94,7 @@ fn run() -> anyhow::Result<()> {
                     image::Rgba([0, 0, 0, 0]),
                 );
                 let new_alpha = image::imageops::blur(&new_alpha, 4.0);
+                let m = m + 1.0;
                 let proj = imageproc::geometric_transformations::Projection::from_control_points(
                     [(0., 0.), (w, 0.), (0., h), (w, h)],
                     [(-m, -m), (w + m, -m), (-m, h + m), (w + m, h + m)],
@@ -106,7 +107,7 @@ fn run() -> anyhow::Result<()> {
                     image::Rgba([0, 0, 0, 0]),
                 );
                 new_alpha.pixels_mut().for_each(|pixel| {
-                    if pixel.0[3] < 175 {
+                    if pixel.0[3] < 128 {
                         pixel.0[3] = 0;
                     } else {
                         pixel.0[3] = 255;
@@ -120,7 +121,7 @@ fn run() -> anyhow::Result<()> {
                     .zip(new_alpha.pixels())
                     // Update the alpha channel of the AI upscaled image with the plain-gaussian upscaled alpha
                     .for_each(|(pixel, gaussian_pixel)| {
-                        if pixel.0[3] < 50 {
+                        if pixel.0[3] < 200 {
                             pixel.0 = gaussian_pixel.0;
                         } else {
                             pixel.0[3] = gaussian_pixel.0[3];

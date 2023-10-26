@@ -89,6 +89,8 @@ fn run() -> anyhow::Result<()> {
                 new_alpha.pixels_mut().for_each(|pixel| {
                     if pixel.0[3] < 128 {
                         pixel.0[3] = 0;
+                    } else {
+                        pixel.0[3] = 255;
                     }
                 });
                 let new_alpha = image::imageops::blur(&new_alpha, 0.5);

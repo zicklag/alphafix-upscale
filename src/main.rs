@@ -81,7 +81,7 @@ fn run() -> anyhow::Result<()> {
                 );
                 let w = upscaled.width() as f32;
                 let h = upscaled.height() as f32;
-                let m = 5.0;
+                let m = 2.0;
                 let proj = imageproc::geometric_transformations::Projection::from_control_points(
                     [(0., 0.), (w, 0.), (0., h), (w, h)],
                     [(m, m), (w - m, m), (m, h - m), (w - m, h - m)],
@@ -93,8 +93,8 @@ fn run() -> anyhow::Result<()> {
                     imageproc::geometric_transformations::Interpolation::Bicubic,
                     image::Rgba([0, 0, 0, 0]),
                 );
-                let new_alpha = image::imageops::blur(&new_alpha, 4.0);
-                let m = m + 1.0;
+                let mut new_alpha = image::imageops::blur(&new_alpha, 3.0);
+                let m = m + 2.0;
                 let proj = imageproc::geometric_transformations::Projection::from_control_points(
                     [(0., 0.), (w, 0.), (0., h), (w, h)],
                     [(-m, -m), (w + m, -m), (-m, h + m), (w + m, h + m)],
@@ -113,6 +113,7 @@ fn run() -> anyhow::Result<()> {
                         pixel.0[3] = 255;
                     }
                 });
+                let mut new_alpha = image::imageops::blur(&new_alpha, 0.75);
 
                 // Get the AI upscaled image
                 let upscaled_rgba8 = upscaled.as_mut_rgba8().unwrap();
@@ -123,7 +124,7 @@ fn run() -> anyhow::Result<()> {
                     .for_each(|(pixel, gaussian_pixel)| {
                         if pixel.0[3] < 200 {
                             pixel.0 = gaussian_pixel.0;
-                        } else {
+                        } else if pixel.0[3] < gaussian_pixel.0[3] {
                             pixel.0[3] = gaussian_pixel.0[3];
                         }
                     });
